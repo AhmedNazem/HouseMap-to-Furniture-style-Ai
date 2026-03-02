@@ -11,18 +11,38 @@ interface UploadProps {
   onComplete: (base64: string) => void;
 }
 
+const ALLOWED_TYPES = ["image/jpeg", "image/png"];
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
+
 const Upload = ({ onComplete }: UploadProps) => {
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const { isSignedIn } = useOutletContext<AuthContext>();
 
   const processFile = (selectedFile: File) => {
     if (!isSignedIn) return;
+
+    if (!ALLOWED_TYPES.includes(selectedFile.type)) {
+      setUploadError("Only JPEG and PNG images are supported.");
+      return;
+    }
+    if (selectedFile.size > MAX_FILE_SIZE) {
+      setUploadError("File exceeds the 50 MB size limit.");
+      return;
+    }
+
+    setUploadError(null);
     setFile(selectedFile);
     setProgress(0);
 
     const reader = new FileReader();
+    reader.onerror = () => {
+      setFile(null);
+      setProgress(0);
+      setUploadError("Failed to read the file. Please try again.");
+    };
     reader.onload = (e) => {
       const base64 = e.target?.result as string;
 
@@ -58,7 +78,7 @@ const Upload = ({ onComplete }: UploadProps) => {
     setIsDragging(false);
     if (!isSignedIn) return;
     const dropped = e.dataTransfer.files?.[0];
-    if (dropped) processFile(dropped);
+    if (dropped && ALLOWED_TYPES.includes(dropped.type)) processFile(dropped);
   };
 
   return (
@@ -87,6 +107,7 @@ const Upload = ({ onComplete }: UploadProps) => {
                 : "Please sign in to upload"}
             </p>
             <p className="help">Maximum file size is 50 MB.</p>
+            {uploadError && <p className="upload-error">{uploadError}</p>}
           </div>
         </div>
       ) : (
